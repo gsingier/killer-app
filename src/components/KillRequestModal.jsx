@@ -3,7 +3,7 @@ import { useGame } from '../context/GameContext';
 import { Skull, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export default function KillRequestModal({ isOpen, onClose, targetPseudo }) {
-  const { user, socket, showNotification } = useGame();
+  const { user, socket, showNotification, refreshPlayerState } = useGame();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -20,52 +20,52 @@ export default function KillRequestModal({ isOpen, onClose, targetPseudo }) {
     setLoading(true);
     setErrorMsg('');
 
-    socket.emit('request_kill', {
+    socket.emit('request_kill_code', {
       killerId: user.userId,
       targetSecretCode: code
     });
 
-    // Listen for socket confirmation or error
     const handleFailed = (msg) => {
       setErrorMsg(msg);
       setLoading(false);
       socket.off('kill_request_failed', handleFailed);
-      socket.off('kill_request_sent', handleSent);
+      socket.off('kill_success', handleSuccess);
     };
 
-    const handleSent = (res) => {
+    const handleSuccess = (msg) => {
       setLoading(false);
-      showNotification(res.message, 'success');
+      showNotification(msg, 'success');
+      refreshPlayerState();
       onClose();
       socket.off('kill_request_failed', handleFailed);
-      socket.off('kill_request_sent', handleSent);
+      socket.off('kill_success', handleSuccess);
     };
 
     socket.on('kill_request_failed', handleFailed);
-    socket.on('kill_request_sent', handleSent);
+    socket.on('kill_success', handleSuccess);
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-      <div className="glass-card-glow max-w-md w-full p-6 rounded-3xl space-y-5 animate-scale-up">
+      <div className="glass-card-glow max-w-md w-full p-6 rounded-3xl space-y-5 animate-scale-up border-2 border-rose-500/50">
         <div className="flex items-center gap-3 text-rose-500">
           <div className="w-12 h-12 rounded-2xl bg-rose-500/20 flex items-center justify-center border border-rose-500/40">
             <Skull className="w-7 h-7" />
           </div>
           <div>
-            <h3 className="font-heading text-xl font-black text-white">Validation du Kill</h3>
+            <h3 className="font-heading text-xl font-black text-white">Méthode 1 : Saisie du Code Secret</h3>
             <p className="text-xs text-slate-300">Cible : <span className="font-bold text-rose-400">{targetPseudo}</span></p>
           </div>
         </div>
 
         <p className="text-xs text-slate-300 leading-relaxed">
-          Pour éliminer votre cible, saisissez le <strong>Code Secret à 4 chiffres</strong> qu'elle vous a révélé suite à votre action réussi.
+          Votre cible vous a révélé son <strong>Code Secret à 4 chiffres</strong> suite à la réussite de votre mission ? Saisissez-le ci-dessous pour valider immédiatement votre contrat !
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">
-              Code Secret (4 chiffres)
+              Code Secret de la Cible (4 chiffres)
             </label>
             <input
               type="text"
@@ -75,7 +75,7 @@ export default function KillRequestModal({ isOpen, onClose, targetPseudo }) {
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
               placeholder="Ex: 4829"
               autoFocus
-              className="w-full text-center text-3xl font-mono font-bold tracking-widest py-3 px-4 rounded-xl glass-input border border-rose-500/30 text-rose-300 placeholder:text-slate-600 focus:outline-none"
+              className="w-full text-center text-3xl font-mono font-bold tracking-widest py-3 px-4 rounded-xl glass-input border border-rose-500/40 text-rose-300 placeholder:text-slate-600 focus:outline-none"
             />
           </div>
 
@@ -101,11 +101,11 @@ export default function KillRequestModal({ isOpen, onClose, targetPseudo }) {
               className="flex-1 py-3 rounded-xl btn-primary text-white text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
-                <span>Vérification...</span>
+                <span>Validation...</span>
               ) : (
                 <>
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Confirmer</span>
+                  <span>Valider le Kill 🎯</span>
                 </>
               )}
             </button>

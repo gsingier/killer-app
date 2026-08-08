@@ -2,17 +2,17 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '../context/GameContext';
 import KillRequestModal from '../components/KillRequestModal';
-import KillConfirmModal from '../components/KillConfirmModal';
 import KillFeed from '../components/KillFeed';
-import { Target, Skull, Shield, Eye, EyeOff, Sparkles, AlertTriangle, Trophy } from 'lucide-react';
+import { Target, Skull, Eye, EyeOff, Sparkles, AlertTriangle, Trophy, CheckCircle, Volume2 } from 'lucide-react';
 
 export default function PlayerDashboard() {
   const navigate = useNavigate();
-  const { user, gameState, refreshPlayerState } = useGame();
+  const { user, socket, gameState, refreshPlayerState, showNotification } = useGame();
 
   const [revealTarget, setRevealTarget] = useState(false);
   const [showKillModal, setShowKillModal] = useState(false);
   const [liveData, setLiveData] = useState(null);
+  const [confirmingSelfKill, setConfirmingSelfKill] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -48,6 +48,14 @@ export default function PlayerDashboard() {
     } catch (e) {}
   };
 
+  // Method 2: Target Self-Elimination
+  const handleSelfEliminate = () => {
+    socket.emit('target_self_eliminate', { targetId: user.userId });
+    setConfirmingSelfKill(false);
+    showNotification('Vous avez validé votre élimination.', 'info');
+    refreshPlayerState();
+  };
+
   if (!user || !gameState) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center p-4">
@@ -59,7 +67,7 @@ export default function PlayerDashboard() {
     );
   }
 
-  // Spectator mode if user is dead
+  // Spectator view when dead
   if (gameState.status === 'dead') {
     return (
       <div className="max-w-md mx-auto p-4 space-y-6">
@@ -72,7 +80,7 @@ export default function PlayerDashboard() {
             Vous êtes désormais un spectre. Observez le reste de la partie et découvrez qui sera l'ultime survivant !
           </p>
           <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-around text-xs">
-            <span className="text-slate-400">Vos Victimes :</span>
+            <span className="text-slate-400">Vos Kills accomplis :</span>
             <span className="font-bold text-rose-400 text-base">{gameState.killsCount || 0} kill(s)</span>
           </div>
         </div>
@@ -82,7 +90,7 @@ export default function PlayerDashboard() {
           className="w-full py-3 rounded-2xl btn-secondary text-rose-300 font-semibold text-sm flex items-center justify-center gap-2"
         >
           <Trophy className="w-4 h-4 text-rose-400" />
-          <span>Voir le Dashboard Live Maître du Jeu</span>
+          <span>Voir le Live Dashboard MJ</span>
         </button>
 
         <KillFeed killfeed={liveData?.killfeed || []} />
@@ -132,49 +140,85 @@ export default function PlayerDashboard() {
         </div>
       </div>
 
-      {/* Mission Card */}
+      {/* Single Word Mission Card */}
       <div className="p-6 rounded-3xl glass-card space-y-3">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-amber-400" />
-          <span className="text-xs font-bold uppercase tracking-wider text-amber-400">Intitulé de la Mission</span>
+          <Volume2 className="w-4 h-4 text-amber-400" />
+          <span className="text-xs font-bold uppercase tracking-wider text-amber-400">Mot Secret à Faire Dire</span>
         </div>
 
-        <p className="text-base font-bold text-white leading-relaxed p-4 rounded-2xl bg-slate-900/80 border border-slate-800">
-          "{gameState.missionDesc || 'Mission secrète'}"
-        </p>
+        <div className="p-5 rounded-2xl bg-slate-950/90 border border-amber-500/30 text-center space-y-1">
+          <span className="text-[11px] text-slate-400 uppercase tracking-widest block font-semibold">Faites prononcer le mot :</span>
+          <p className="font-heading text-3xl font-black text-amber-400 tracking-widest uppercase">
+            "{gameState.missionDesc || 'MOT SECRET'}"
+          </p>
+        </div>
 
-        <p className="text-[11px] text-slate-400 leading-tight">
-          Faites accomplir cette action à votre cible sans vous faire repérer. Demandez-lui son <strong>Code Secret à 4 chiffres</strong> une fois réussi.
+        <p className="text-[11px] text-slate-400 text-center leading-relaxed">
+          Faites dire ce mot unique à votre cible pendant une conversation sans qu'elle ne se doute de rien !
         </p>
       </div>
 
-      {/* Action Button: J'AI ÉLIMINÉ MA CIBLE */}
-      <div className="space-y-3 pt-2">
+      {/* Kill Validation Options */}
+      <div className="space-y-3 pt-1">
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block text-center">
+          Options de Validation de Kill
+        </span>
+
+        {/* Option 1: Killer enters Code */}
         <button
           onClick={() => setShowKillModal(true)}
-          className="w-full py-4 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-lg tracking-wide uppercase shadow-xl shadow-rose-600/40 active:scale-95 transition-all flex items-center justify-center gap-3"
+          className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-sm tracking-wide uppercase shadow-lg shadow-rose-600/30 active:scale-95 transition-all flex items-center justify-center gap-2"
         >
-          <Skull className="w-6 h-6" />
-          <span>J'ai éliminé ma cible</span>
+          <Skull className="w-5 h-5" />
+          <span>J'ai fait dire le mot (Entrer le Code)</span>
         </button>
+
+        {/* Option 2: Target Self-Elimination */}
+        {confirmingSelfKill ? (
+          <div className="p-4 rounded-2xl bg-rose-950/80 border border-rose-600 text-center space-y-3 animate-fade-in">
+            <p className="text-xs font-bold text-white">
+              Confirmez-vous que vous avez été piégé(e) et éliminé(e) ?
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setConfirmingSelfKill(false)}
+                className="flex-1 py-2 rounded-xl btn-secondary text-xs font-semibold"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleSelfEliminate}
+                className="flex-1 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold"
+              >
+                Oui, je suis éliminé(e) ☠️
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmingSelfKill(true)}
+            className="w-full py-3 px-4 rounded-2xl glass-card hover:bg-slate-800/80 border border-slate-700/80 text-slate-300 hover:text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all"
+          >
+            <AlertTriangle className="w-4 h-4 text-amber-400" />
+            <span>J'ai été piégé(e) / Je valide mon élimination</span>
+          </button>
+        )}
 
         <button
           onClick={() => navigate('/live')}
-          className="w-full py-2.5 rounded-xl btn-secondary text-slate-400 hover:text-white font-semibold text-xs flex items-center justify-center gap-2"
+          className="w-full py-2 rounded-xl text-slate-500 hover:text-slate-300 font-medium text-[11px] text-center"
         >
-          <span>Voir le Live & Killfeed</span>
+          Voir le Dashboard Live
         </button>
       </div>
 
-      {/* Kill Request Modal (Step A) */}
+      {/* Kill Request Modal (Option 1) */}
       <KillRequestModal
         isOpen={showKillModal}
         onClose={() => setShowKillModal(false)}
         targetPseudo={gameState.targetPseudo}
       />
-
-      {/* Incoming Kill Confirmation Modal (Step B) */}
-      <KillConfirmModal />
     </div>
   );
 }
