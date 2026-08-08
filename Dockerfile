@@ -4,7 +4,7 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Install build dependencies for native modules (better-sqlite3)
-RUN apk add --no-co-cache python3 make g++ gcc
+RUN apk add --no-cache python3 make g++ gcc
 
 COPY package*.json ./
 RUN npm ci
@@ -18,7 +18,7 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 
 # Install runtime dependencies for SQLite
-RUN apk add --no-co-cache python3 make g++ gcc
+RUN apk add --no-cache python3 make g++ gcc
 
 ENV NODE_ENV=production
 ENV PORT=5000
