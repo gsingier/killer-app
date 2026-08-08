@@ -2,7 +2,7 @@ import db from '../db.js';
 import { cryptoRandomString, generateSecretCode, generateGameCode, shuffle } from '../utils.js';
 
 export class GameEngine {
-  // Create a new game with selected mission categories and custom missions
+  // Create game with selected mission categories and custom missions
   static createGame(name, selectedCategories = [], customMissions = []) {
     let code = generateGameCode();
     while (db.prepare('SELECT id FROM games WHERE code = ?').get(code)) {
@@ -17,7 +17,6 @@ export class GameEngine {
 
     const gameMissions = [];
 
-    // Add selected categories from default missions pool
     if (selectedCategories.length > 0) {
       const placeholders = selectedCategories.map(() => '?').join(',');
       const defaults = db.prepare(`
@@ -45,7 +44,6 @@ export class GameEngine {
       }
     }
 
-    // Add custom missions/words
     for (const text of customMissions) {
       if (text && text.trim()) {
         gameMissions.push({
@@ -108,7 +106,7 @@ export class GameEngine {
     };
   }
 
-  // Start game & initialize circular chain
+  // Start game & initialize circular chain with UNIQUE words per player
   static startGame(gameId) {
     const game = db.prepare('SELECT * FROM games WHERE id = ?').get(gameId);
     if (!game) throw new Error('Partie non trouvée.');
@@ -126,8 +124,15 @@ export class GameEngine {
       SELECT id, description FROM missions WHERE game_id = ?
     `).all(gameId);
 
-    if (gameMissions.length === 0) {
-      throw new Error('Aucune mission disponible pour cette partie.');
+    if (gameMissions.length < players.length) {
+      // If pool is smaller than players, copy remaining default missions
+      const extraDefaults = db.prepare('SELECT category, description FROM missions WHERE game_id IS NULL').all();
+      const insertMission = db.prepare('INSERT INTO missions (id, game_id, category, description, is_custom) VALUES (?, ?, ?, ?, 0)');
+      for (const m of extraDefaults) {
+        const newId = cryptoRandomString();
+        insertMission.run(newId, gameId, m.category, m.description);
+        gameMissions.push({ id: newId, description: m.description });
+      }
     }
 
     const shuffledPlayers = shuffle(players);
@@ -139,11 +144,12 @@ export class GameEngine {
       VALUES (?, ?, ?, ?, ?, 'active')
     `);
 
+    // Strictly unique word assignment: each player gets a unique mission index [0..n-1]
     const createContracts = db.transaction(() => {
       for (let i = 0; i < n; i++) {
         const killer = shuffledPlayers[i];
         const target = shuffledPlayers[(i + 1) % n];
-        const mission = shuffledMissions[i % shuffledMissions.length];
+        const mission = shuffledMissions[i]; // Unique word per contract!
 
         insertContract.run(
           cryptoRandomString(),
@@ -162,7 +168,7 @@ export class GameEngine {
     return { success: true, playersCount: n };
   }
 
-  // Core execution of a kill transaction (used by both Killer Code & Target Self-Confirmation)
+  // Core execution of a kill transaction (ensures reassigned word is NOT held by any other active player)
   static executeKill(contractId) {
     const contract = db.prepare(`
       SELECT c.*, m.description as mission_desc, k.pseudo as killer_pseudo, t.pseudo as target_pseudo
@@ -219,9 +225,22 @@ export class GameEngine {
       // 6. Reassign target to killer
       const nextTargetId = targetContract ? targetContract.target_id : killerId;
 
-      const availableMissions = db.prepare(`
-        SELECT id, description FROM missions WHERE game_id = ?
-      `).all(gameId);
+      // STRICT UNUSED WORD FILTER: Pick a word NOT currently assigned to any active player in the game!
+      let availableMissions = db.prepare(`
+        SELECT id, description FROM missions 
+        WHERE game_id = ? 
+        AND id NOT IN (
+          SELECT mission_id FROM contracts WHERE game_id = ? AND status = 'active'
+        )
+      `).all(gameId, gameId);
+
+      // Fallback if all custom words are exhausted
+      if (availableMissions.length === 0) {
+        availableMissions = db.prepare(`
+          SELECT id, description FROM missions WHERE game_id = ?
+        `).all(gameId);
+      }
+
       const randomMission = shuffle(availableMissions)[0];
 
       const newContractId = cryptoRandomString();
@@ -260,7 +279,6 @@ export class GameEngine {
       return { success: false, message: 'Code secret de la cible incorrect !' };
     }
 
-    // Direct instant kill execution!
     const killResult = GameEngine.executeKill(activeContract.id);
     return {
       success: true,
