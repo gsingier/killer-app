@@ -1,0 +1,9 @@
+node_modules
+dist
+killer.db
+killer.db-wal
+killer.db-shm
+.git
+.gitignore
+README.md
+*.log

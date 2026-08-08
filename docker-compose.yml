@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  killer-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: killer-app
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - DB_PATH=/app/data/killer.db
+      - NODE_ENV=production
+    volumes:
+      - killer_data:/app/data
+
+volumes:
+  killer_data:
+    driver: local

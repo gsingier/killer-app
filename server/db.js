@@ -1,11 +1,21 @@
 import Database from 'better-sqlite3';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const dbPath = path.join(__dirname, '..', 'killer.db');
+// Allow environment variable DB_PATH for Docker volume persistence (e.g. /app/data/killer.db)
+const defaultDbPath = path.join(__dirname, '..', 'killer.db');
+const dbPath = process.env.DB_PATH || defaultDbPath;
+
+// Ensure parent directory exists for DB file
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
+
 const db = new Database(dbPath);
 
 // Enable Foreign Keys & Write-Ahead Logging for performance
@@ -70,6 +80,6 @@ db.exec(`
   );
 `);
 
-console.log('✅ Base de données SQLite initialisée avec succès.');
+console.log(`✅ Base de données SQLite initialisée sur ${dbPath}`);
 
 export default db;
