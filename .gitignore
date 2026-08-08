@@ -1,0 +1,8 @@
+node_modules/
+dist/
+killer.db
+killer.db-wal
+killer.db-shm
+.env
+.DS_Store
+*.log
