@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '../context/GameContext';
 import KillRequestModal from '../components/KillRequestModal';
-import KillFeed from '../components/KillFeed';
-import { Target, Skull, Eye, EyeOff, Sparkles, AlertTriangle, Trophy, CheckCircle, Volume2 } from 'lucide-react';
+import { Target, Skull, Eye, EyeOff, AlertTriangle, Volume2, Shield } from 'lucide-react';
 
 export default function PlayerDashboard() {
   const navigate = useNavigate();
@@ -11,7 +10,6 @@ export default function PlayerDashboard() {
 
   const [revealTarget, setRevealTarget] = useState(false);
   const [showKillModal, setShowKillModal] = useState(false);
-  const [liveData, setLiveData] = useState(null);
   const [confirmingSelfKill, setConfirmingSelfKill] = useState(false);
 
   useEffect(() => {
@@ -21,12 +19,7 @@ export default function PlayerDashboard() {
     }
 
     refreshPlayerState();
-    fetchLiveFeed();
-
-    const interval = setInterval(() => {
-      refreshPlayerState();
-      fetchLiveFeed();
-    }, 4000);
+    const interval = setInterval(refreshPlayerState, 4000);
 
     return () => clearInterval(interval);
   }, [user]);
@@ -37,18 +30,6 @@ export default function PlayerDashboard() {
     }
   }, [gameState, navigate]);
 
-  const fetchLiveFeed = async () => {
-    if (!user?.gameId) return;
-    try {
-      const res = await fetch(`/api/games/${user.gameId}/live`);
-      if (res.ok) {
-        const data = await res.json();
-        setLiveData(data);
-      }
-    } catch (e) {}
-  };
-
-  // Method 2: Target Self-Elimination
   const handleSelfEliminate = () => {
     socket.emit('target_self_eliminate', { targetId: user.userId });
     setConfirmingSelfKill(false);
@@ -67,39 +48,62 @@ export default function PlayerDashboard() {
     );
   }
 
-  // Spectator view when dead
+  const isOrganizer = user.role === 'organizer';
+
+  // Spectator / Ghost view for eliminated regular players
   if (gameState.status === 'dead') {
     return (
       <div className="max-w-md mx-auto p-4 space-y-6">
-        <div className="p-6 rounded-3xl glass-card text-center space-y-3 border border-rose-900/50">
-          <div className="w-16 h-16 rounded-full bg-rose-950/80 border border-rose-800 text-rose-500 flex items-center justify-center mx-auto shadow-lg shadow-rose-950">
-            <Skull className="w-8 h-8" />
+        <div className="p-8 rounded-3xl glass-card text-center space-y-4 border border-rose-900/50">
+          <div className="w-20 h-20 rounded-full bg-rose-950/80 border-2 border-rose-800 text-rose-500 flex items-center justify-center mx-auto shadow-xl shadow-rose-950 animate-pulse">
+            <Skull className="w-10 h-10" />
           </div>
-          <h2 className="font-heading text-2xl font-black text-white">Vous avez été Éliminé !</h2>
-          <p className="text-xs text-slate-400">
-            Vous êtes désormais un spectre. Observez le reste de la partie et découvrez qui sera l'ultime survivant !
-          </p>
-          <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-around text-xs">
-            <span className="text-slate-400">Vos Kills accomplis :</span>
-            <span className="font-bold text-rose-400 text-base">{gameState.killsCount || 0} kill(s)</span>
+
+          <div className="space-y-1">
+            <h2 className="font-heading text-2xl font-black text-white">Vous avez été Éliminé !</h2>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Votre aventure s'arrête ici. Profitez de la soirée et attendez l'annonce finale du grand vainqueur ! 👻
+            </p>
           </div>
+
+          <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between text-xs">
+            <span className="text-slate-400 font-medium">Vos Kills accomplis :</span>
+            <span className="font-mono text-xl font-bold text-rose-400">{gameState.killsCount || 0} kill(s)</span>
+          </div>
+
+          {/* Button strictly for Organizer */}
+          {isOrganizer && (
+            <button
+              onClick={() => navigate('/live')}
+              className="w-full py-3 rounded-2xl btn-primary text-white font-bold text-xs flex items-center justify-center gap-2"
+            >
+              <Shield className="w-4 h-4" />
+              <span>Ouvrir le Tableau de Bord MJ</span>
+            </button>
+          )}
         </div>
-
-        <button
-          onClick={() => navigate('/live')}
-          className="w-full py-3 rounded-2xl btn-secondary text-rose-300 font-semibold text-sm flex items-center justify-center gap-2"
-        >
-          <Trophy className="w-4 h-4 text-rose-400" />
-          <span>Voir le Live Dashboard MJ</span>
-        </button>
-
-        <KillFeed killfeed={liveData?.killfeed || []} />
       </div>
     );
   }
 
   return (
     <div className="max-w-md mx-auto p-4 space-y-6">
+      {/* MJ Quick Access Header Button */}
+      {isOrganizer && (
+        <button
+          onClick={() => navigate('/live')}
+          className="w-full py-2.5 px-4 rounded-xl bg-slate-900/90 border border-rose-500/30 hover:border-rose-500/60 text-rose-400 font-bold text-xs flex items-center justify-between transition-colors shadow-lg"
+        >
+          <span className="flex items-center gap-2">
+            <Shield className="w-4 h-4 text-rose-500" />
+            <span>Vue Maître du Jeu (Confidentiel)</span>
+          </span>
+          <span className="text-[10px] uppercase font-extrabold bg-rose-500/20 px-2 py-0.5 rounded-full border border-rose-500/40">
+            MJ
+          </span>
+        </button>
+      )}
+
       {/* Target Secret Card */}
       <div className="p-6 rounded-3xl glass-card-glow text-center space-y-4 relative overflow-hidden">
         <div className="flex items-center justify-between">
@@ -204,13 +208,6 @@ export default function PlayerDashboard() {
             <span>J'ai été piégé(e) / Je valide mon élimination</span>
           </button>
         )}
-
-        <button
-          onClick={() => navigate('/live')}
-          className="w-full py-2 rounded-xl text-slate-500 hover:text-slate-300 font-medium text-[11px] text-center"
-        >
-          Voir le Dashboard Live
-        </button>
       </div>
 
       {/* Kill Request Modal (Option 1) */}
