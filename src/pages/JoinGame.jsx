@@ -70,22 +70,24 @@ export default function JoinGame() {
         </button>
         <div>
           <h2 className="font-heading text-2xl font-black text-white">Rejoindre une Partie</h2>
-          <p className="text-xs text-slate-400">Entrez le code communiqué par l'organisateur</p>
+          <p className="text-xs text-slate-400">Entrez le code à 6 chiffres communiqué par le MJ</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4 glass-card p-6 rounded-3xl">
         <div>
           <label className="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider flex items-center gap-1.5">
-            <KeyRound className="w-4 h-4 text-rose-400" /> Code de Partie
+            <KeyRound className="w-4 h-4 text-rose-400" /> Code de Partie (6 chiffres)
           </label>
           <input
             type="text"
+            inputMode="numeric"
+            maxLength={6}
             value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
-            placeholder="Ex: KILL-8492"
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+            placeholder="Ex: 849201"
             required
-            className="w-full py-3.5 px-4 text-center text-2xl font-mono font-bold tracking-wider rounded-xl glass-input text-rose-400 uppercase placeholder:text-slate-600 focus:outline-none"
+            className="w-full py-3.5 px-4 text-center text-3xl font-mono font-bold tracking-widest rounded-xl glass-input text-rose-400 placeholder:text-slate-600 focus:outline-none"
           />
         </div>
 

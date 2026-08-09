@@ -5,15 +5,14 @@ export function cryptoRandomString(length = 12) {
   return randomBytes(length).toString('hex').slice(0, length);
 }
 
-// Generates 4-digit secret code for player validation
+// Generates 4-digit secret code for player kill validation
 export function generateSecretCode() {
   return Math.floor(1000 + Math.random() * 9000).toString();
 }
 
-// Generates short game code like KILL-8492
+// Generates clean 6-digit game code (ex: 849201)
 export function generateGameCode() {
-  const num = Math.floor(1000 + Math.random() * 9000);
-  return `KILL-${num}`;
+  return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 // Fisher-Yates shuffle algorithm
